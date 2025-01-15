@@ -1,0 +1,147 @@
+Colaborative filtering based book recommendation system
+
+import numpy as np
+import pandas as pd
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+
+books=pd.read_csv('/content/drive/MyDrive/Book_dataset/BX-Books.csv',sep=";",on_bad_lines='skip',encoding='latin-1')
+
+books.head(5)
+
+books.shape
+
+books.columns
+
+books=books[['ISBN', 'Book-Title', 'Book-Author', 'Year-Of-Publication', 'Publisher', 'Image-URL-L']]
+
+books.rename(columns={
+    'Book-Title':'title',
+    'Book-Author':'author',
+    'Year-Of-Publication':'year',
+    'Image-URL-L':'img_url'},inplace=True)
+books.head(5)
+
+users=pd.read_csv('/content/drive/MyDrive/Book_dataset/BX-Users.csv',sep=";",on_bad_lines='skip',encoding='latin-1')
+ratings=pd.read_csv('/content/drive/MyDrive/Book_dataset/BX-Book-Ratings.csv',sep=";",on_bad_lines='skip',encoding='latin-1')
+
+users.head()
+
+users.shape
+
+ratings.head()
+
+ratings.shape
+
+ratings.rename(columns={
+    'User-ID':'user_id',
+    'Book-Rating':'rating'},inplace=True)
+
+ratings.head()
+
+ratings['user_id'].value_counts()
+
+ratings['user_id'].unique().shape
+
+x=ratings['user_id'].value_counts()>200
+x[x].shape
+
+y=x[x].index
+y
+
+ratings[ratings['user_id'].isin(y)]
+
+ratings.shape
+
+ratings_of_books=ratings.merge(books, on="ISBN")
+
+ratings_of_books.head()
+
+ratings_of_books.shape
+
+num_rating=ratings_of_books.groupby('title')['rating'].count().reset_index()
+
+num_rating.rename(columns={'rating':'num_of_ratings'},inplace=True)
+
+num_rating.head()
+
+final_table=ratings_of_books.merge(num_rating,on='title')
+final_table
+
+final_ratings=final_table[final_table['num_of_ratings']>=50]
+final_ratings.head()
+
+final_ratings.shape
+
+final_ratings.drop_duplicates(['user_id','title'],inplace=True)
+
+final_ratings.shape
+
+book_pivot=final_ratings.pivot_table(columns='user_id',index='title',values='rating')
+
+book_pivot
+
+book_pivot.shape
+
+book_pivot.fillna(0,inplace=True)
+
+book_pivot.head()
+
+from scipy.sparse import csr_matrix
+
+book_sparse=csr_matrix(book_pivot)
+
+book_sparse
+
+MODEL BUILDING
+
+from sklearn.neighbors import NearestNeighbors
+model=NearestNeighbors(algorithm='brute')
+
+model.fit(book_sparse)
+
+book_pivot.index[2]
+
+ distance,suggestion=model.kneighbors(book_pivot.iloc[2,:].values.reshape(1,-1),n_neighbors=5)
+
+distance
+
+suggestion
+
+for i in range(len(suggestion)):
+  print(book_pivot.index[suggestion[i]])
+
+books_name=book_pivot.index
+
+import pickle
+with open('/content/drive/MyDrive/Book_dataset/artifacts/books_name.pkl', 'wb') as f:
+    pickle.dump(books_name, f)
+with open('/content/drive/MyDrive/Book_dataset/artifacts/final_ratings.pkl', 'wb') as f:
+    pickle.dump(final_ratings, f)
+with open('/content/drive/MyDrive/Book_dataset/artifacts/book_pivot.pkl', 'wb') as f:
+    pickle.dump(book_pivot, f)
+
+def recommend_book(book_name):
+  book_id=np.where(book_pivot.index==book_name)[0][0]
+  distance,suggestion=model.kneighbors(book_pivot.iloc[book_id,:].values.reshape(1,-1),n_neighbors=5)
+
+  for i in range(len(suggestion)):
+    books=book_pivot.index[suggestion[i]]
+    for j in books:
+      print(j)
+
+book_name='To Kill a Mockingbird'
+recommend_book(book_name)
+
+book_name='Pride and Prejudice'
+recommend_book(book_name)
+
+book_name='Harry Potter and the Chamber of Secrets (Book 2)'
+recommend_book(book_name)
+
+book_name='The Secret'
+recommend_book(book_name)
+
+book_name='1984'
+recommend_book(book_name)
+
